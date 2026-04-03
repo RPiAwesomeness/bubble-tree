@@ -31,7 +31,7 @@ func initialModel() model {
 	w, h, err := term.GetSize(os.Stdout.Fd())
 	if err != nil {
 		w = WIDTH
-		h = HEIGHT - 1
+		h = HEIGHT
 	}
 
 	top, right, bottom, left := styleDoc.GetPadding()
@@ -56,6 +56,12 @@ func initialModel() model {
 				{
 					Value: "grep",
 					Desc:  "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
+					Children: []tree.Node{
+						{Value: "g", Desc: "7th letter of the English alphabet"},
+						{Value: "r", Desc: "18th letter of the English alphabet"},
+						{Value: "e", Desc: "5th letter of the English alphabet"},
+						{Value: "p", Desc: "16th letter of the English alphabet"},
+					},
 				},
 				{
 					Value: "docker",
@@ -113,17 +119,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			m.msg = "Active node selected: "
+			if m.msg == "" {
+				// On the first time, update height to account for new string below
+				m.tree.SetHeight(m.tree.Height() - 2)
+			}
+
+			var details strings.Builder
+			details.WriteString("\nActive node selected: ")
 			for i, node := range m.tree.ActivePath() {
 				if i > 0 {
-					m.msg += ", "
+					details.WriteString(" > ")
 				}
-				m.msg += node.Value
+				details.WriteString(node.Value)
 			}
 
 			if active := m.tree.ActiveNode(); active != nil {
-				m.msg += fmt.Sprintf(" (desc: %q, tags: %q)", active.Desc, strings.Join(active.Tags, ","))
+				fmt.Fprintf(&details, "\n(desc: %q, tags: %q)", active.Desc, strings.Join(active.Tags, ","))
 			}
+
+			m.msg = details.String()
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
@@ -136,9 +150,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() tea.View {
 	return tea.NewView(
-		lipgloss.JoinVertical(lipgloss.Top,
-			styleDoc.Render(m.tree.View()),
-			m.msg,
+		styleDoc.Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				m.tree.View(),
+				m.msg,
+			),
 		),
 	)
 }

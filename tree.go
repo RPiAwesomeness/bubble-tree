@@ -23,8 +23,9 @@ type Model struct {
 	KeyMap KeyMap
 	Styles Styles
 
-	nodes  []Node
-	cursor uint
+	nodes    []Node
+	numNodes uint
+	cursor   uint
 
 	width  uint
 	height uint
@@ -102,7 +103,8 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 		childPrefix:       childPrefix,
 		highlightFullLine: fullHighlight,
 
-		nodes: nodes,
+		nodes:    nodes,
+		numNodes: numberOfNodes(nodes),
 
 		width:  w,
 		height: h,
@@ -119,6 +121,7 @@ func (m Model) Nodes() []Node {
 
 func (m *Model) SetNodes(nodes []Node) {
 	m.nodes = nodes
+	m.numNodes = numberOfNodes(nodes)
 	m.cursor = 0
 }
 
@@ -179,40 +182,39 @@ func (m Model) ActivePath() []*Node {
 	return findPath(m.nodes)
 }
 
-func (m Model) NumberOfNodes() uint {
-	var countNodes func([]Node) int
-	countNodes = func(nodes []Node) int {
-		count := len(nodes)
-		for _, node := range nodes {
-			if node.Children != nil {
-				count += countNodes(node.Children)
-			}
-		}
-		return count
+func (m Model) NumberOfNodes() int {
+	return int(m.numNodes)
+}
+
+func (m Model) Width() int {
+	return int(m.width)
+}
+
+func (m Model) Height() int {
+	return int(m.height)
+}
+
+func (m *Model) SetSize(width, height int) {
+	if width >= 0 {
+		m.width = uint(width)
 	}
-
-	return uint(countNodes(m.nodes))
+	if height >= 0 {
+		m.height = uint(width)
+	}
 }
 
-func (m Model) Width() uint {
-	return m.width
+func (m *Model) SetWidth(width int) {
+	if width < 0 {
+		return
+	}
+	m.width = uint(width)
 }
 
-func (m Model) Height() uint {
-	return m.height
-}
-
-func (m *Model) SetSize(width, height uint) {
-	m.width = width
-	m.height = height
-}
-
-func (m *Model) SetWidth(newWidth uint) {
-	m.width = newWidth
-}
-
-func (m *Model) SetHeight(newHeight uint) {
-	m.height = newHeight
+func (m *Model) SetHeight(height int) {
+	if height < 0 {
+		return
+	}
+	m.height = uint(height)
 }
 
 func (m Model) Cursor() uint {
@@ -241,7 +243,7 @@ func (m *Model) NavUp() {
 }
 
 func (m *Model) NavDown() {
-	numNodes := m.NumberOfNodes()
+	numNodes := m.numNodes
 	if m.cursor >= numNodes-1 {
 		m.cursor = numNodes - 1
 		return
@@ -321,7 +323,7 @@ func (m Model) View() string {
 	}
 
 	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
-	return lipgloss.JoinVertical(lipgloss.Top,
+	return lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
 		help,
 	)
@@ -337,10 +339,9 @@ func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint)
 		// If we aren't at the root, we add the arrow shape to the string
 		if indent > 0 {
 			indentSpaces := int((indent - 1) * 2)
-			shape := fmt.Sprintf("%s%s ",
-				strings.Repeat(" ", indentSpaces),
+			str += fmt.Sprintf("%*s%s ",
+				indentSpaces, "",
 				m.Styles.Shapes.Render(m.childPrefix))
-			str += shape
 		}
 
 		// Generate the correct index for the node
@@ -369,7 +370,7 @@ func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint)
 			str += fmt.Sprintf("%s%*s", style.Render(valueStr), fillerLen, "")
 
 			if node.Desc != "" {
-				descLen := len(node.Value)
+				descLen := len(node.Desc)
 				descHighlightLen := int(math.Min(
 					float64(descLen),
 					math.Max(float64(DESC_MAX_WIDTH), float64(descLen)),
@@ -378,17 +379,33 @@ func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint)
 				descStr := fmt.Sprintf("%-*s", descHighlightLen, node.Desc)
 				str += fmt.Sprintf("\t\t%s%*s", style.Render(descStr), fillerLen, "")
 			}
+
 		}
 
 		str += "\n"
 		b.WriteString(str)
 
-		if node.Children != nil {
+		if len(node.Children) > 0 {
 			childStr, childCount := m.renderTree(node.Children, indent+1, finalCount)
-			finalCount += childCount - 1
+			finalCount = childCount
 			b.WriteString(childStr)
 		}
 	}
 
 	return b.String(), finalCount
+}
+
+func numberOfNodes(nodes []Node) uint {
+	var countNodes func([]Node) int
+	countNodes = func(nodes []Node) int {
+		count := len(nodes)
+		for _, node := range nodes {
+			if node.Children != nil {
+				count += countNodes(node.Children)
+			}
+		}
+		return count
+	}
+
+	return uint(countNodes(nodes))
 }
