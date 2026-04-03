@@ -76,6 +76,7 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 	keyMap := DefaultKeyMap()
 	childPrefix := string(Smooth)
 	fullHighlight := false
+	var highlightColor color.Color = nil
 
 	if options != nil {
 		showHelp = options.ShowHelp
@@ -92,11 +93,13 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 		}
 
 		fullHighlight = options.HighlightFullLine
+
+		highlightColor = options.HighlightColor
 	}
 
 	return Model{
 		KeyMap:            keyMap,
-		Styles:            defaultStyles(options.HighlightColor),
+		Styles:            defaultStyles(highlightColor),
 		childPrefix:       childPrefix,
 		highlightFullLine: fullHighlight,
 
