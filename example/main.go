@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	tree "github.com/savannahostrowski/tree-bubble"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	tree "github.com/rpiawesomeness/bubble-tree"
 	"golang.org/x/term"
 )
 
@@ -13,9 +13,14 @@ var (
 	styleDoc = lipgloss.NewStyle().Padding(1)
 )
 
+const (
+	WIDTH  = 80
+	HEIGHT = 24
+)
+
 func main() {
-	err := tea.NewProgram(initialModel()).Start()
-	if err != nil {
+	p := tea.NewProgram(initialModel())
+	if _, err := p.Run(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -23,12 +28,14 @@ func main() {
 func initialModel() model {
 	w, h, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		w = 80
-		h = 24
+		w = WIDTH
+		h = HEIGHT
 	}
+
 	top, right, bottom, left := styleDoc.GetPadding()
 	w = w - left - right
 	h = h - top - bottom
+
 	nodes := []tree.Node{
 		{
 			Value: "history | grep docker",
@@ -36,27 +43,27 @@ func initialModel() model {
 				"command history for any entries that contain the word 'docker.'",
 			Children: []tree.Node{
 				{
-				Value:    "history",
-				Desc:     "Shows the history of all commands in the terminal",
-				Children: nil,
-			}, 
-			{
-				Value:    "|",
-				Desc:     "Used to combine two or more commands",
-				Children: nil,
+					Value:    "history",
+					Desc:     "Shows the history of all commands in the terminal",
+					Children: nil,
+				},
+				{
+					Value:    "|",
+					Desc:     "Used to combine two or more commands",
+					Children: nil,
+				},
+				{
+					Value:    "grep",
+					Desc:     "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
+					Children: nil,
+				},
+				{
+					Value:    "docker",
+					Desc:     "Used to interact with Docker",
+					Children: nil,
+				},
 			},
-		{
-				Value:    "grep",
-				Desc:     "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
-				Children: nil,
-			},
-{
-				Value:    "docker",
-				Desc:     "Used to interact with Docker",
-				Children: nil,
-			},
-		},
-	}};
+		}}
 
 	return model{tree: tree.New(nodes, w, h)}
 }
@@ -82,6 +89,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
-	return styleDoc.Render(m.tree.View())
+func (m model) View() tea.View {
+	return tea.NewView(styleDoc.Render(m.tree.View()))
 }

@@ -1,8 +1,7 @@
-package bubbleTree
+package tree
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -10,37 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
-
-const (
-	BOTTOM_LEFT_CURVED   = " ╰──"
-	BOTTOM_LEFT_STRAIGHT = " └──"
-
-	WHITE = lipgloss.White
-	BLACK = lipgloss.Black
-)
-
-var (
-	PURPLE = lipgloss.Color("#bd93f9")
-)
-
-type Styles struct {
-	Shapes     lipgloss.Style
-	Selected   lipgloss.Style
-	Unselected lipgloss.Style
-	Help       lipgloss.Style
-}
-
-func defaultStyles() Styles {
-	hasDarkBg := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
-	lightDark := lipgloss.LightDark(hasDarkBg)
-
-	return Styles{
-		Shapes:     lipgloss.NewStyle().Margin(0).Foreground(PURPLE),
-		Selected:   lipgloss.NewStyle().Margin(0).Background(PURPLE),
-		Unselected: lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
-		Help:       lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
-	}
-}
 
 type Node struct {
 	Value    string
@@ -63,6 +31,11 @@ type Model struct {
 	AdditionalShortHelpKeys func() []key.Binding
 }
 
+const (
+	VALUE_WIDTH = 10
+	DESC_WIDTH  = 20
+)
+
 func New(nodes []Node, width int, height int) Model {
 	return Model{
 		KeyMap: DefaultKeyMap(),
@@ -74,64 +47,6 @@ func New(nodes []Node, width int, height int) Model {
 
 		showHelp: true,
 		Help:     help.New(),
-	}
-}
-
-// KeyMap holds the key bindings for the table.
-type KeyMap struct {
-	Bottom      key.Binding
-	Top         key.Binding
-	SectionDown key.Binding
-	SectionUp   key.Binding
-	Down        key.Binding
-	Up          key.Binding
-	Quit        key.Binding
-
-	ShowFullHelp  key.Binding
-	CloseFullHelp key.Binding
-}
-
-// DefaultKeyMap is the default key bindings for the table.
-func DefaultKeyMap() KeyMap {
-	return KeyMap{
-		Bottom: key.NewBinding(
-			key.WithKeys("bottom"),
-			key.WithHelp("end", "bottom"),
-		),
-		Top: key.NewBinding(
-			key.WithKeys("top"),
-			key.WithHelp("home", "top"),
-		),
-		SectionDown: key.NewBinding(
-			key.WithKeys("secdown"),
-			key.WithHelp("secdown", "section down"),
-		),
-		SectionUp: key.NewBinding(
-			key.WithKeys("secup"),
-			key.WithHelp("secup", "section up"),
-		),
-		Down: key.NewBinding(
-			key.WithKeys("down"),
-			key.WithHelp("↓", "down"),
-		),
-		Up: key.NewBinding(
-			key.WithKeys("up"),
-			key.WithHelp("↑", "up"),
-		),
-
-		ShowFullHelp: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "more"),
-		),
-		CloseFullHelp: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "close help"),
-		),
-
-		Quit: key.NewBinding(
-			key.WithKeys("q", "esc"),
-			key.WithHelp("q", "quit"),
-		),
 	}
 }
 
@@ -195,20 +110,22 @@ func (m *Model) SetShowHelp() bool {
 }
 
 func (m *Model) NavUp() {
-	m.cursor--
-
-	if m.cursor < 0 {
+	if m.cursor <= 0 {
 		m.cursor = 0
 		return
 	}
+
+	m.cursor--
 }
 
 func (m *Model) NavDown() {
-	m.cursor++
-
-	if m.cursor >= m.NumberOfNodes() {
-		m.cursor = m.NumberOfNodes() - 1
+	numNodes := m.NumberOfNodes()
+	if m.cursor >= numNodes-1 {
+		m.cursor = numNodes
+		return
 	}
+
+	m.cursor++
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -230,19 +147,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	availableHeight := m.height
-	var sections []string
-
 	nodes := m.Nodes()
 
-	var help string
+	help := ""
+	availableHeight := m.height
 	if m.showHelp {
 		help = m.helpView()
 		availableHeight -= lipgloss.Height(help)
 	}
 
 	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
-	sections = append(sections, lipgloss.NewStyle().Height(availableHeight).Render(renderedTree), help)
+	sections := []string{
+		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
+		help,
+	}
 
 	if len(nodes) == 0 {
 		return "No data"
@@ -250,11 +168,11 @@ func (m Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
-func (m *Model) renderTree(remainingNodes []Node, indent int, count int) (string, int) {
+func (m *Model) renderTree(nodes []Node, indent int, count int) (string, int) {
 	var b strings.Builder
 	finalCount := count
 
-	for _, node := range remainingNodes {
+	for _, node := range nodes {
 		str := ""
 
 		// If we aren't at the root, we add the arrow shape to the string
@@ -268,58 +186,24 @@ func (m *Model) renderTree(remainingNodes []Node, indent int, count int) (string
 		finalCount++
 
 		// Format the string with fixed width for the value and description fields
-		valueWidth := 10
-		descWidth := 20
-		valueStr := fmt.Sprintf("%-*s", valueWidth, node.Value)
-		descStr := fmt.Sprintf("%-*s", descWidth, node.Desc)
+		valueStr := fmt.Sprintf("%-*s", VALUE_WIDTH, node.Value)
+		descStr := fmt.Sprintf("%-*s", DESC_WIDTH, node.Desc)
 
 		// If we are at the cursor, we add the selected style to the string
+		style := m.Styles.Unselected
 		if m.cursor == idx {
-			str += fmt.Sprintf("%s\t\t%s\n", m.Styles.Selected.Render(valueStr), m.Styles.Selected.Render(descStr))
-		} else {
-			str += fmt.Sprintf("%s\t\t%s\n", m.Styles.Unselected.Render(valueStr), m.Styles.Unselected.Render(descStr))
+			style = m.Styles.Selected
 		}
+		str += fmt.Sprintf("%s\t\t%s\n", style.Render(valueStr), style.Render(descStr))
 
 		b.WriteString(str)
 
 		if node.Children != nil {
-			childStr, childCount := m.renderTree(node.Children, indent+1, count)
+			childStr, childCount := m.renderTree(node.Children, indent+1, finalCount)
 			finalCount += childCount
 			b.WriteString(childStr)
 		}
 	}
 
 	return b.String(), finalCount
-}
-
-func (m Model) helpView() string {
-	return m.Styles.Help.Render(m.Help.View(m))
-}
-
-func (m Model) ShortHelp() []key.Binding {
-	kb := []key.Binding{
-		m.KeyMap.Up,
-		m.KeyMap.Down,
-	}
-
-	if m.AdditionalShortHelpKeys != nil {
-		kb = append(kb, m.AdditionalShortHelpKeys()...)
-	}
-
-	return append(kb,
-		m.KeyMap.Quit,
-	)
-}
-
-func (m Model) FullHelp() [][]key.Binding {
-	kb := [][]key.Binding{{
-		m.KeyMap.Up,
-		m.KeyMap.Down,
-	}}
-
-	return append(kb,
-		[]key.Binding{
-			m.KeyMap.Quit,
-			m.KeyMap.CloseFullHelp,
-		})
 }

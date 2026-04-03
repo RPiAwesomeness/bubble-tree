@@ -1,0 +1,96 @@
+package tree
+
+import "charm.land/bubbles/v2/key"
+
+// KeyMap holds the key bindings for the table.
+type KeyMap struct {
+	Bottom key.Binding
+	Top    key.Binding
+	Right  key.Binding
+	Left   key.Binding
+	Down   key.Binding
+	Up     key.Binding
+	Quit   key.Binding
+
+	ShowFullHelp  key.Binding
+	CloseFullHelp key.Binding
+}
+
+// DefaultKeyMap is the default key bindings for the table.
+func DefaultKeyMap() KeyMap {
+	return KeyMap{
+		Bottom: key.NewBinding(
+			key.WithKeys("bottom"),
+			key.WithHelp("end", "bottom"),
+		),
+		Top: key.NewBinding(
+			key.WithKeys("top"),
+			key.WithHelp("home", "top"),
+		),
+		Left: key.NewBinding(
+			key.WithKeys("left"),
+			key.WithHelp("←", "go to parent"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("right"),
+			key.WithHelp("→", "go to next child"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down"),
+			key.WithHelp("↓", "down"),
+		),
+		Up: key.NewBinding(
+			key.WithKeys("up"),
+			key.WithHelp("↑", "up"),
+		),
+
+		ShowFullHelp: key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "more"),
+		),
+		CloseFullHelp: key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "close help"),
+		),
+
+		Quit: key.NewBinding(
+			key.WithKeys("q", "esc"),
+			key.WithHelp("q", "quit"),
+		),
+	}
+}
+
+func (m Model) helpView() string {
+	return m.Styles.Help.Render(m.Help.View(m))
+}
+
+func (m Model) ShortHelp() []key.Binding {
+	kb := []key.Binding{
+		m.KeyMap.Up,
+		m.KeyMap.Down,
+	}
+
+	if m.AdditionalShortHelpKeys != nil {
+		kb = append(kb, m.AdditionalShortHelpKeys()...)
+	}
+
+	return append(kb,
+		m.KeyMap.Quit,
+	)
+}
+
+func (m Model) FullHelp() [][]key.Binding {
+	kb := [][]key.Binding{{
+		m.KeyMap.Up,
+		m.KeyMap.Down,
+		// TODO: Re-enable once supported
+		// m.KeyMap.Left,
+		// m.KeyMap.Right,
+	}}
+
+	return append(kb,
+		[]key.Binding{
+			m.KeyMap.Quit,
+			m.KeyMap.CloseFullHelp,
+		})
+}
