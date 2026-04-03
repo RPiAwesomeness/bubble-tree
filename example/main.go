@@ -45,27 +45,47 @@ func initialModel() model {
 				{
 					Value:    "history",
 					Desc:     "Shows the history of all commands in the terminal",
-					Children: nil,
+					Children: nil, // default value is nil, this is just for demonstration
 				},
 				{
-					Value:    "|",
-					Desc:     "Used to combine two or more commands",
-					Children: nil,
+					Value: "|",
+					Desc:  "Used to combine two or more commands",
 				},
 				{
-					Value:    "grep",
-					Desc:     "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
-					Children: nil,
+					Value: "grep",
+					Desc:  "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
 				},
 				{
-					Value:    "docker",
-					Desc:     "Used to interact with Docker",
-					Children: nil,
+					Value: "docker",
+					Desc:  "Used to interact with Docker",
 				},
 			},
-		}}
+		},
+		{
+			Value: "echo \"Success\"",
+			Desc:  "A simple success string, printed to the terminal",
+			Children: []tree.Node{
+				{
+					Value: "echo",
+					Desc:  "display a line of text",
+				},
+				{Value: "echo"}, // No Desc field will not render the highligh to the right
+			},
+		},
+	}
 
-	return model{tree: tree.New(nodes, w, h)}
+	return model{
+		tree: tree.New(
+			nodes,
+			w, h,
+			&tree.TreeOptions{
+				// ChildPrefix:       tree.Sharp,   // .Sharp and .Smooth are default values provided, but this can be any string
+				// HighlightFullLine: true,         // Set to false to only highlight characters in .Value/.Desc
+				// HighlightColor:    lipgloss.Red, // Any color.Color value, defaults to a nice purple
+				// HelpKey:           "f1",         // Change keybind for showing help, default is "?". Requires ShowHelp to be set to true.
+				// ShowHelp:          false,        // Set to true to show help text, default is false
+			}),
+	}
 }
 
 type model struct {

@@ -2,6 +2,8 @@ package tree
 
 import (
 	"fmt"
+	"image/color"
+	"math"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -20,10 +22,15 @@ type Model struct {
 	KeyMap KeyMap
 	Styles Styles
 
-	width  int
-	height int
 	nodes  []Node
-	cursor int
+	cursor uint
+
+	width  uint
+	height uint
+
+	childPrefix string
+	// Highlight the full line from end-to-end, or just the contents
+	highlightFullLine bool
 
 	Help     help.Model
 	showHelp bool
@@ -31,21 +38,77 @@ type Model struct {
 	AdditionalShortHelpKeys func() []key.Binding
 }
 
+type TreeVariant string
+
 const (
-	VALUE_WIDTH = 10
-	DESC_WIDTH  = 20
+	Sharp  TreeVariant = " └──"
+	Smooth TreeVariant = " ╰──"
 )
 
-func New(nodes []Node, width int, height int) Model {
+type TreeOptions struct {
+	HelpKey           string
+	ChildPrefix       TreeVariant
+	ShowHelp          bool
+	HighlightColor    color.Color
+	HighlightFullLine bool
+}
+
+const (
+	VALUE_MAX_WIDTH uint = 10
+	DESC_MAX_WIDTH  uint = 20
+	DEFAULT_WIDTH   uint = 80
+	DEFAULT_HEIGHT  uint = 24
+)
+
+func New(nodes []Node, width, height int, options *TreeOptions) Model {
+	var w, h uint
+	if width < 0 {
+		w = 0
+	} else {
+		w = uint(width)
+	}
+	if height < 0 {
+		h = 0
+	} else {
+		h = uint(height)
+	}
+
+	showHelp := false
+	keyMap := DefaultKeyMap()
+	childPrefix := string(Smooth)
+	fullHighlight := false
+
+	if options != nil {
+		showHelp = options.ShowHelp
+
+		if options.HelpKey != "" {
+			keyMap.ShowFullHelp.SetKeys(options.HelpKey)
+			keyMap.CloseFullHelp.SetKeys(options.HelpKey)
+		} else {
+			keyMap.ShowFullHelp.SetKeys("?")
+			keyMap.CloseFullHelp.SetKeys("?")
+		}
+
+		if options.ChildPrefix != "" {
+			childPrefix = string(options.ChildPrefix)
+		}
+
+		fullHighlight = options.HighlightFullLine
+	}
+
 	return Model{
-		KeyMap: DefaultKeyMap(),
-		Styles: defaultStyles(),
+		KeyMap:            keyMap,
+		Styles:            defaultStyles(options.HighlightColor),
+		childPrefix:       childPrefix,
+		highlightFullLine: fullHighlight,
 
-		width:  width,
-		height: height,
-		nodes:  nodes,
+		nodes: nodes,
 
-		showHelp: true,
+		width:  w,
+		height: h,
+		cursor: 0,
+
+		showHelp: showHelp,
 		Help:     help.New(),
 	}
 }
@@ -58,8 +121,8 @@ func (m *Model) SetNodes(nodes []Node) {
 	m.nodes = nodes
 }
 
-func (m *Model) NumberOfNodes() int {
-	count := 0
+func (m Model) NumberOfNodes() uint {
+	count := uint(0)
 
 	var countNodes func([]Node)
 	countNodes = func(nodes []Node) {
@@ -76,36 +139,40 @@ func (m *Model) NumberOfNodes() int {
 	return count
 }
 
-func (m Model) Width() int {
+func (m Model) Width() uint {
 	return m.width
 }
 
-func (m Model) Height() int {
+func (m Model) Height() uint {
 	return m.height
 }
 
-func (m *Model) SetSize(width, height int) {
+func (m *Model) SetSize(width, height uint) {
 	m.width = width
 	m.height = height
 }
 
-func (m *Model) SetWidth(newWidth int) {
-	m.SetSize(newWidth, m.height)
+func (m *Model) SetWidth(newWidth uint) {
+	m.width = newWidth
 }
 
-func (m *Model) SetHeight(newHeight int) {
-	m.SetSize(m.width, newHeight)
+func (m *Model) SetHeight(newHeight uint) {
+	m.height = newHeight
 }
 
-func (m Model) Cursor() int {
+func (m Model) Cursor() uint {
 	return m.cursor
 }
 
-func (m *Model) SetCursor(cursor int) {
+func (m *Model) SetCursor(cursor uint) {
 	m.cursor = cursor
 }
 
-func (m *Model) SetShowHelp() bool {
+func (m *Model) ResetCursor() {
+	m.cursor = 0
+}
+
+func (m *Model) ShowHelp() bool {
 	return m.showHelp
 }
 
@@ -121,7 +188,7 @@ func (m *Model) NavUp() {
 func (m *Model) NavDown() {
 	numNodes := m.NumberOfNodes()
 	if m.cursor >= numNodes-1 {
-		m.cursor = numNodes
+		m.cursor = numNodes - 1
 		return
 	}
 
@@ -150,7 +217,7 @@ func (m Model) View() string {
 	nodes := m.Nodes()
 
 	help := ""
-	availableHeight := m.height
+	availableHeight := int(m.height)
 	if m.showHelp {
 		help = m.helpView()
 		availableHeight -= lipgloss.Height(help)
@@ -165,10 +232,10 @@ func (m Model) View() string {
 	if len(nodes) == 0 {
 		return "No data"
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	return lipgloss.JoinVertical(lipgloss.Top, sections...)
 }
 
-func (m *Model) renderTree(nodes []Node, indent int, count int) (string, int) {
+func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
 	var b strings.Builder
 	finalCount := count
 
@@ -177,7 +244,10 @@ func (m *Model) renderTree(nodes []Node, indent int, count int) (string, int) {
 
 		// If we aren't at the root, we add the arrow shape to the string
 		if indent > 0 {
-			shape := strings.Repeat(" ", (indent-1)*2) + m.Styles.Shapes.Render(BOTTOM_LEFT_CURVED) + " "
+			indentSpaces := int((indent - 1) * 2)
+			shape := fmt.Sprintf("%s%s ",
+				strings.Repeat(" ", indentSpaces),
+				m.Styles.Shapes.Render(m.childPrefix))
 			str += shape
 		}
 
@@ -185,22 +255,43 @@ func (m *Model) renderTree(nodes []Node, indent int, count int) (string, int) {
 		idx := finalCount
 		finalCount++
 
-		// Format the string with fixed width for the value and description fields
-		valueStr := fmt.Sprintf("%-*s", VALUE_WIDTH, node.Value)
-		descStr := fmt.Sprintf("%-*s", DESC_WIDTH, node.Desc)
-
-		// If we are at the cursor, we add the selected style to the string
+		// If we are at the cursor, add the selected style to the string
 		style := m.Styles.Unselected
 		if m.cursor == idx {
 			style = m.Styles.Selected
 		}
-		str += fmt.Sprintf("%s\t\t%s\n", style.Render(valueStr), style.Render(descStr))
 
+		// Format the string with fixed width for the value and description fields
+		if m.highlightFullLine {
+			str += style.Render(fmt.Sprintf("%-*s\t\t%-*s", VALUE_MAX_WIDTH, node.Value, DESC_MAX_WIDTH, node.Desc))
+		} else {
+			valLen := len(node.Value)
+			valHighlightLen := int(math.Min(
+				float64(valLen),
+				math.Max(float64(VALUE_MAX_WIDTH), float64(valLen)),
+			))
+			fillerLen := int(VALUE_MAX_WIDTH) - valHighlightLen
+			valueStr := fmt.Sprintf("%-*s", valHighlightLen, node.Value)
+			str += fmt.Sprintf("%s%*s", style.Render(valueStr), fillerLen, "")
+
+			if node.Desc != "" {
+				descLen := len(node.Value)
+				descHighlightLen := int(math.Min(
+					float64(descLen),
+					math.Max(float64(DESC_MAX_WIDTH), float64(descLen)),
+				))
+				fillerLen := int(DESC_MAX_WIDTH) - descHighlightLen
+				descStr := fmt.Sprintf("%-*s", descHighlightLen, node.Desc)
+				str += fmt.Sprintf("\t\t%s%*s", style.Render(descStr), fillerLen, "")
+			}
+		}
+
+		str += "\n"
 		b.WriteString(str)
 
 		if node.Children != nil {
 			childStr, childCount := m.renderTree(node.Children, indent+1, finalCount)
-			finalCount += childCount
+			finalCount += childCount - 1
 			b.WriteString(childStr)
 		}
 	}
