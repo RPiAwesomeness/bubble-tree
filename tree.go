@@ -61,15 +61,13 @@ const (
 )
 
 func New(nodes []Node, width, height int, options *TreeOptions) Model {
-	var w, h uint
-	if width < 0 {
-		w = 0
-	} else {
+	w := DEFAULT_WIDTH
+	if width > 0 {
 		w = uint(width)
 	}
-	if height < 0 {
-		h = 0
-	} else {
+
+	h := DEFAULT_HEIGHT
+	if height > 0 {
 		h = uint(height)
 	}
 
@@ -318,16 +316,15 @@ func (m Model) View() string {
 		availableHeight -= lipgloss.Height(help)
 	}
 
-	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
-	sections := []string{
-		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
-		help,
-	}
-
 	if len(m.nodes) == 0 {
 		return "No data"
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+
+	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
+	return lipgloss.JoinVertical(lipgloss.Top,
+		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
+		help,
+	)
 }
 
 func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
