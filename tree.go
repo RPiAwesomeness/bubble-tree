@@ -1,21 +1,26 @@
-package tree
+package bubbleTree
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
-	bottomLeft string = " └──"
+	BOTTOM_LEFT_CURVED   = " ╰──"
+	BOTTOM_LEFT_STRAIGHT = " └──"
 
-	white  = lipgloss.Color("#ffffff")
-	black  = lipgloss.Color("#000000")
-	purple = lipgloss.Color("#bd93f9")
+	WHITE = lipgloss.White
+	BLACK = lipgloss.Black
+)
+
+var (
+	PURPLE = lipgloss.Color("#bd93f9")
 )
 
 type Styles struct {
@@ -26,11 +31,14 @@ type Styles struct {
 }
 
 func defaultStyles() Styles {
+	hasDarkBg := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	lightDark := lipgloss.LightDark(hasDarkBg)
+
 	return Styles{
-		Shapes:     lipgloss.NewStyle().Margin(0, 0, 0, 0).Foreground(purple),
-		Selected:   lipgloss.NewStyle().Margin(0, 0, 0, 0).Background(purple),
-		Unselected: lipgloss.NewStyle().Margin(0, 0, 0, 0).Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"}),
-		Help:       lipgloss.NewStyle().Margin(0, 0, 0, 0).Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#ffffff"}),
+		Shapes:     lipgloss.NewStyle().Margin(0).Foreground(PURPLE),
+		Selected:   lipgloss.NewStyle().Margin(0).Background(PURPLE),
+		Unselected: lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
+		Help:       lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
 	}
 }
 
@@ -151,7 +159,6 @@ func (m *Model) NumberOfNodes() int {
 	countNodes(m.nodes)
 
 	return count
-
 }
 
 func (m Model) Width() int {
@@ -194,7 +201,6 @@ func (m *Model) NavUp() {
 		m.cursor = 0
 		return
 	}
-
 }
 
 func (m *Model) NavDown() {
@@ -202,7 +208,6 @@ func (m *Model) NavDown() {
 
 	if m.cursor >= m.NumberOfNodes() {
 		m.cursor = m.NumberOfNodes() - 1
-		return
 	}
 }
 
@@ -236,8 +241,8 @@ func (m Model) View() string {
 		availableHeight -= lipgloss.Height(help)
 	}
 
-	count := 0 // This is used to keep track of the index of the node we are on (important because we are using a recursive function)
-	sections = append(sections, lipgloss.NewStyle().Height(availableHeight).Render(m.renderTree(m.nodes, 0, &count)), help)
+	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
+	sections = append(sections, lipgloss.NewStyle().Height(availableHeight).Render(renderedTree), help)
 
 	if len(nodes) == 0 {
 		return "No data"
@@ -245,22 +250,22 @@ func (m Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
-func (m *Model) renderTree(remainingNodes []Node, indent int, count *int) string {
+func (m *Model) renderTree(remainingNodes []Node, indent int, count int) (string, int) {
 	var b strings.Builder
+	finalCount := count
 
 	for _, node := range remainingNodes {
-
-		var str string
+		str := ""
 
 		// If we aren't at the root, we add the arrow shape to the string
 		if indent > 0 {
-			shape := strings.Repeat(" ", (indent-1)*2) + m.Styles.Shapes.Render(bottomLeft) + " "
+			shape := strings.Repeat(" ", (indent-1)*2) + m.Styles.Shapes.Render(BOTTOM_LEFT_CURVED) + " "
 			str += shape
 		}
 
 		// Generate the correct index for the node
-		idx := *count
-		*count++
+		idx := finalCount
+		finalCount++
 
 		// Format the string with fixed width for the value and description fields
 		valueWidth := 10
@@ -278,12 +283,13 @@ func (m *Model) renderTree(remainingNodes []Node, indent int, count *int) string
 		b.WriteString(str)
 
 		if node.Children != nil {
-			childStr := m.renderTree(node.Children, indent+1, count)
+			childStr, childCount := m.renderTree(node.Children, indent+1, count)
+			finalCount += childCount
 			b.WriteString(childStr)
 		}
 	}
 
-	return b.String()
+	return b.String(), finalCount
 }
 
 func (m Model) helpView() string {

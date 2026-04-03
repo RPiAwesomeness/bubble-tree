@@ -1,5 +1,5 @@
 {
-	"name": "Tree Bubble",
+	"name": "Bubble Tree",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": ".."
