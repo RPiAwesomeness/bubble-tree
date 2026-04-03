@@ -28,6 +28,7 @@ type Model struct {
 	width  uint
 	height uint
 
+	// Prefix string for child nodes, defaults to Smooth TreeVariant
 	childPrefix string
 	// Highlight the full line from end-to-end, or just the contents
 	highlightFullLine bool
@@ -175,7 +176,7 @@ func (m *Model) ShowHelp() bool {
 
 func (m *Model) NavUp() {
 	if m.cursor <= 0 {
-		m.cursor = 0
+		m.ResetCursor()
 		return
 	}
 
@@ -192,6 +193,44 @@ func (m *Model) NavDown() {
 	m.cursor++
 }
 
+func (m *Model) NavParent() {
+	if m.cursor == 0 {
+		return
+	}
+
+	// Create a mapping of each node index to its parent index
+	nodeToParent := make(map[uint]uint)
+
+	var traverse func(nodes []Node, startIndex, parentIndex uint) uint
+	traverse = func(nodes []Node, startIndex, parentIndex uint) uint {
+		count := startIndex
+
+		for _, node := range nodes {
+			currentIndex := count
+			count++ // Move past current node
+
+			// Record parent of current node (except root nodes which have no parent)
+			if parentIndex != ^uint(0) { // ^uint(0) is max uint value, used as "no parent"
+				nodeToParent[currentIndex] = parentIndex
+			}
+
+			// Traverse children
+			if len(node.Children) > 0 {
+				count = traverse(node.Children, count, currentIndex)
+			}
+		}
+		return count
+	}
+
+	// Start traversal with no parent (using max uint as sentinel)
+	traverse(m.nodes, 0, ^uint(0))
+
+	// Move cursor to parent if exists
+	if parent, exists := nodeToParent[m.cursor]; exists {
+		m.cursor = parent
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -200,6 +239,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.NavUp()
 		case key.Matches(msg, m.KeyMap.Down):
 			m.NavDown()
+		case key.Matches(msg, m.KeyMap.Parent):
+			m.NavParent()
 		case key.Matches(msg, m.KeyMap.ShowFullHelp):
 			fallthrough
 		case key.Matches(msg, m.KeyMap.CloseFullHelp):

@@ -69,7 +69,14 @@ func initialModel() model {
 					Value: "echo",
 					Desc:  "display a line of text",
 				},
-				{Value: "echo"}, // No Desc field will not render the highligh to the right
+				{
+					Value: "\"Success\"",
+					Children: []tree.Node{
+						{Value: "\"", Desc: "Begin quote"},
+						{Value: "Success"},
+						{Value: "\"", Desc: "End quote"},
+					},
+				},
 			},
 		},
 	}
@@ -79,7 +86,7 @@ func initialModel() model {
 			nodes,
 			w, h,
 			&tree.TreeOptions{
-				ChildPrefix:       tree.Sharp,    // .Sharp and .Smooth are default values provided, but this can be any string
+				ChildPrefix:       "==>",         // tree.Sharp and tree.Smooth are options provided, but this can be any string
 				HighlightFullLine: true,          // Set to false to only highlight characters in .Value/.Desc
 				HighlightColor:    lipgloss.Cyan, // Any color.Color value, defaults to a nice purple
 				HelpKey:           "f1",          // Change keybind for showing help, default is "?". Requires ShowHelp to be set to true.
