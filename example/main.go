@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 	tree "github.com/rpiawesomeness/bubble-tree"
-	"golang.org/x/term"
 )
 
 var (
@@ -26,10 +28,10 @@ func main() {
 }
 
 func initialModel() model {
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+	w, h, err := term.GetSize(os.Stdout.Fd())
 	if err != nil {
 		w = WIDTH
-		h = HEIGHT
+		h = HEIGHT - 1
 	}
 
 	top, right, bottom, left := styleDoc.GetPadding()
@@ -64,6 +66,7 @@ func initialModel() model {
 		{
 			Value: "echo \"Success\"",
 			Desc:  "A simple success string, printed to the terminal",
+			Tags:  []string{"command"},
 			Children: []tree.Node{
 				{
 					Value: "echo",
@@ -71,6 +74,7 @@ func initialModel() model {
 				},
 				{
 					Value: "\"Success\"",
+					Tags:  []string{"child", "nested"},
 					Children: []tree.Node{
 						{Value: "\"", Desc: "Begin quote"},
 						{Value: "Success"},
@@ -97,6 +101,7 @@ func initialModel() model {
 
 type model struct {
 	tree tree.Model
+	msg  string
 }
 
 func (m model) Init() tea.Cmd {
@@ -107,15 +112,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "enter":
+			active := m.tree.ActiveNode()
+			m.msg = fmt.Sprintf("Active node selected: %s (tags: %s)", active.Value, strings.Join(active.Tags, ","))
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
 	}
+
 	var cmd tea.Cmd
 	m.tree, cmd = m.tree.Update(msg)
 	return m, cmd
 }
 
 func (m model) View() tea.View {
-	return tea.NewView(styleDoc.Render(m.tree.View()))
+	return tea.NewView(
+		lipgloss.JoinVertical(lipgloss.Top,
+			styleDoc.Render(m.tree.View()),
+			m.msg,
+		),
+	)
 }

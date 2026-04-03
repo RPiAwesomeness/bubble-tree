@@ -15,6 +15,7 @@ import (
 type Node struct {
 	Value    string
 	Desc     string
+	Tags     []string
 	Children []Node
 }
 
@@ -120,24 +121,51 @@ func (m Model) Nodes() []Node {
 
 func (m *Model) SetNodes(nodes []Node) {
 	m.nodes = nodes
+	m.cursor = 0
+}
+
+func (m *Model) ActiveNode() *Node {
+	index := 0
+
+	var traverse func(*Node) *Node
+	traverse = func(node *Node) *Node {
+		// Check if current position matches cursor
+		if index == int(m.cursor) {
+			return node
+		}
+		index++
+
+		// Search in children
+		for i := range node.Children {
+			if found := traverse(&node.Children[i]); found != nil {
+				return found
+			}
+		}
+		return nil
+	}
+
+	// Search through root nodes
+	for i := range m.nodes {
+		if found := traverse(&m.nodes[i]); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 func (m Model) NumberOfNodes() uint {
-	count := uint(0)
-
-	var countNodes func([]Node)
-	countNodes = func(nodes []Node) {
+	var countNodes func([]Node) int
+	countNodes = func(nodes []Node) int {
+		count := len(nodes)
 		for _, node := range nodes {
-			count++
 			if node.Children != nil {
-				countNodes(node.Children)
+				count += countNodes(node.Children)
 			}
 		}
+		return count
 	}
 
-	countNodes(m.nodes)
-
-	return count
+	return uint(countNodes(m.nodes))
 }
 
 func (m Model) Width() uint {
