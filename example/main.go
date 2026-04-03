@@ -113,8 +113,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			active := m.tree.ActiveNode()
-			m.msg = fmt.Sprintf("Active node selected: %s (tags: %s)", active.Value, strings.Join(active.Tags, ","))
+			m.msg = "Active node selected: "
+			for i, node := range m.tree.ActivePath() {
+				if i > 0 {
+					m.msg += ", "
+				}
+				m.msg += node.Value
+			}
+
+			if active := m.tree.ActiveNode(); active != nil {
+				m.msg += fmt.Sprintf(" (desc: %q, tags: %q)", active.Desc, strings.Join(active.Tags, ","))
+			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}

@@ -124,7 +124,7 @@ func (m *Model) SetNodes(nodes []Node) {
 	m.cursor = 0
 }
 
-func (m *Model) ActiveNode() *Node {
+func (m Model) ActiveNode() *Node {
 	index := 0
 
 	var traverse func(*Node) *Node
@@ -151,6 +151,34 @@ func (m *Model) ActiveNode() *Node {
 		}
 	}
 	return nil
+}
+
+func (m Model) ActivePath() []*Node {
+	var index int
+
+	var findPath func([]Node) []*Node
+	findPath = func(nodes []Node) []*Node {
+		for i, node := range nodes {
+			// Check if this is the active node
+			if index == int(m.cursor) {
+				return []*Node{&nodes[i]}
+			}
+			index++
+
+			// Check children if active node not found yet
+			if len(node.Children) == 0 {
+				continue
+			}
+
+			if path := findPath(node.Children); path != nil {
+				// Prepend current node to the path found in children
+				return append([]*Node{&nodes[i]}, path...)
+			}
+		}
+		return nil
+	}
+
+	return findPath(m.nodes)
 }
 
 func (m Model) NumberOfNodes() uint {
