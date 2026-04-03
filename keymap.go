@@ -46,7 +46,7 @@ func DefaultKeyMap() KeyMap {
 
 		ShowFullHelp: key.NewBinding(
 			key.WithKeys("?"),
-			key.WithHelp("?", "more"),
+			key.WithHelp("?", "help"),
 		),
 		CloseFullHelp: key.NewBinding(
 			key.WithKeys("?"),
@@ -65,18 +65,12 @@ func (m Model) helpView() string {
 }
 
 func (m Model) ShortHelp() []key.Binding {
-	kb := []key.Binding{
+	return []key.Binding{
 		m.KeyMap.Up,
 		m.KeyMap.Down,
-	}
-
-	if m.AdditionalShortHelpKeys != nil {
-		kb = append(kb, m.AdditionalShortHelpKeys()...)
-	}
-
-	return append(kb,
+		m.KeyMap.ShowFullHelp,
 		m.KeyMap.Quit,
-	)
+	}
 }
 
 func (m Model) FullHelp() [][]key.Binding {

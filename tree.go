@@ -34,8 +34,6 @@ type Model struct {
 
 	Help     help.Model
 	showHelp bool
-
-	AdditionalShortHelpKeys func() []key.Binding
 }
 
 type TreeVariant string
@@ -83,10 +81,9 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 
 		if options.HelpKey != "" {
 			keyMap.ShowFullHelp.SetKeys(options.HelpKey)
+			keyMap.ShowFullHelp.SetHelp(options.HelpKey, "help")
 			keyMap.CloseFullHelp.SetKeys(options.HelpKey)
-		} else {
-			keyMap.ShowFullHelp.SetKeys("?")
-			keyMap.CloseFullHelp.SetKeys("?")
+			keyMap.CloseFullHelp.SetHelp(options.HelpKey, "close help")
 		}
 
 		if options.ChildPrefix != "" {
@@ -214,8 +211,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	nodes := m.Nodes()
-
 	help := ""
 	availableHeight := int(m.height)
 	if m.showHelp {
@@ -229,10 +224,10 @@ func (m Model) View() string {
 		help,
 	}
 
-	if len(nodes) == 0 {
+	if len(m.nodes) == 0 {
 		return "No data"
 	}
-	return lipgloss.JoinVertical(lipgloss.Top, sections...)
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
@@ -262,15 +257,17 @@ func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint)
 		}
 
 		// Format the string with fixed width for the value and description fields
+		valLen := len(node.Value)
+
 		if m.highlightFullLine {
 			str += style.Render(fmt.Sprintf("%-*s\t\t%-*s", VALUE_MAX_WIDTH, node.Value, DESC_MAX_WIDTH, node.Desc))
 		} else {
-			valLen := len(node.Value)
 			valHighlightLen := int(math.Min(
 				float64(valLen),
 				math.Max(float64(VALUE_MAX_WIDTH), float64(valLen)),
 			))
 			fillerLen := int(VALUE_MAX_WIDTH) - valHighlightLen
+
 			valueStr := fmt.Sprintf("%-*s", valHighlightLen, node.Value)
 			str += fmt.Sprintf("%s%*s", style.Render(valueStr), fillerLen, "")
 
