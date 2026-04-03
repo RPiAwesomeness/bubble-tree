@@ -1,6 +1,6 @@
 # Bubble Tree 🫧🌳
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/rpiawesomeness/bubble-tree)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rpiawesomeness/bubble-tree)](https://pkg.go.dev/github.com/rpiawesomeness/bubble-tree)
 [![All Contributors](https://img.shields.io/github/all-contributors/RPiAwesomeness/bubble-tree?color=bd93f9&style=flat-square)](#contributors)
 
 A TUI tree view for Charm's Bubble Tea framework
@@ -10,7 +10,7 @@ A TUI tree view for Charm's Bubble Tea framework
 ## Installation
 
 ```bash
-go get github.com/rpiawesomeness/bubble-tree
+go get github.com/rpiawesomeness/bubble-tree@latest
 ```
 
 ## Example
