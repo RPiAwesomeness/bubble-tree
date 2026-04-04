@@ -5,8 +5,6 @@
 
 A TUI tree view for Charm's Bubble Tea framework
 
-![A GIF of a tree view TUI, displaying `history | grep docker` at the root and each term as a child node](bubble-tree.gif)
-
 ## Installation
 
 ```bash
@@ -16,6 +14,16 @@ go get github.com/rpiawesomeness/bubble-tree@latest
 ## Example
 
 For an example, please take a look at the `/example` directory.
+
+### Default View
+
+![A GIF of a tree view TUI, displaying `history | grep docker` at the root and each term as a child node](demo.gif)
+
+### Customized Styling
+
+![A GIF of a tree view TUI, displaying `history | grep docker` at the root and each term as a child node with different colors and indentation characters](demo-b.gif)
+
+Custom color and child prefix, full active line highlight, and help text.
 
 ## Contributing
 

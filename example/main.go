@@ -41,12 +41,11 @@ func initialModel() model {
 	nodes := []tree.Node{
 		{
 			Value: "history | grep docker",
-			Desc: "Used in a Unix-like operating system to search through the " +
-				"command history for any entries that contain the word 'docker.'",
+			Desc:  "Search through the command history for any references to \"docker\"",
 			Children: []tree.Node{
 				{
 					Value:    "history",
-					Desc:     "Shows the history of all commands in the terminal",
+					Desc:     "Shows history of all commands in the terminal",
 					Children: nil, // default value is nil, this is just for demonstration
 				},
 				{
@@ -55,7 +54,7 @@ func initialModel() model {
 				},
 				{
 					Value: "grep",
-					Desc:  "Short for 'global regular expression print'; A command used in searching and matching text files contained in the regular expressions.",
+					Desc:  "Short for 'global regular expression print' - used in searching & matching text files",
 					Children: []tree.Node{
 						{Value: "g", Desc: "7th letter of the English alphabet"},
 						{Value: "r", Desc: "18th letter of the English alphabet"},

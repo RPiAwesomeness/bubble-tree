@@ -3,7 +3,6 @@ package tree
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -311,84 +310,91 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	help := ""
-	availableHeight := int(m.height)
-	if m.showHelp {
-		help = m.helpView()
-		availableHeight -= lipgloss.Height(help)
-	}
-
 	if len(m.nodes) == 0 {
 		return "No data"
 	}
 
 	renderedTree, _ := m.renderTree(m.nodes, 0, 0)
+
+	if !m.showHelp {
+		return renderedTree
+	}
+
+	help := m.helpView()
+	availableHeight := int(m.height) - lipgloss.Height(help)
 	return lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
 		help,
 	)
 }
 
-func (m *Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
-	var b strings.Builder
-	finalCount := count
+func (m Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
+	type row struct {
+		indent string
+		value  string
+		desc   string
+		idx    uint
+	}
 
-	for _, node := range nodes {
-		str := ""
+	var rows []row
+	maxColWidth := 0
 
-		// If we aren't at the root, we add the arrow shape to the string
-		if indent > 0 {
-			indentSpaces := int((indent - 1) * 2)
-			str += fmt.Sprintf("%*s%s ",
-				indentSpaces, "",
-				m.Styles.Shapes.Render(m.childPrefix))
+	// First pass: collect data and find the widest column 1 (visible width)
+	var collect func([]Node, uint, uint) uint
+	collect = func(nodes []Node, indent uint, count uint) uint {
+		finalCount := count
+		for _, node := range nodes {
+			idx := finalCount
+			finalCount++
+
+			indentStr := ""
+			if indent > 0 {
+				indentStr = fmt.Sprintf("%s %s ",
+					strings.Repeat(" ", int((indent-1)*2)),
+					m.Styles.Shapes.Render(m.childPrefix),
+				)
+			}
+
+			// Use lipgloss.Width for proper Unicode/ANSI handling
+			width := lipgloss.Width(indentStr) + lipgloss.Width(node.Value)
+			if width > maxColWidth {
+				maxColWidth = width
+			}
+
+			rows = append(rows, row{indentStr, node.Value, node.Desc, idx})
+
+			if len(node.Children) > 0 {
+				finalCount = collect(node.Children, indent+1, finalCount)
+			}
 		}
+		return finalCount
+	}
 
-		// Generate the correct index for the node
-		idx := finalCount
-		finalCount++
+	finalCount := collect(nodes, indent, count)
 
-		// If we are at the cursor, add the selected style to the string
+	// Second pass: render with manual padding (plain spaces between styled parts)
+	var b strings.Builder
+	for _, r := range rows {
 		style := m.Styles.Unselected
-		if m.cursor == idx {
+		if m.cursor == r.idx {
 			style = m.Styles.Selected
 		}
 
-		// Format the string with fixed width for the value and description fields
-		valLen := len(node.Value)
+		// Calculate how many spaces needed to align to maxColWidth + 1 (for gap)
+		currentWidth := lipgloss.Width(r.indent) + lipgloss.Width(r.value)
+		padding := strings.Repeat(" ", maxColWidth-currentWidth+1)
 
 		if m.highlightFullLine {
-			str += style.Render(fmt.Sprintf("%-*s\t\t%-*s", VALUE_MAX_WIDTH, node.Value, DESC_MAX_WIDTH, node.Desc))
+			// Style everything after the tree indent
+			line := r.value + padding + r.desc
+			fmt.Fprintf(&b, "%s%s\n", r.indent, style.Render(line))
 		} else {
-			valHighlightLen := int(math.Min(
-				float64(valLen),
-				math.Max(float64(VALUE_MAX_WIDTH), float64(valLen)),
-			))
-			fillerLen := int(VALUE_MAX_WIDTH) - valHighlightLen
-
-			valueStr := fmt.Sprintf("%-*s", valHighlightLen, node.Value)
-			str += fmt.Sprintf("%s%*s", style.Render(valueStr), fillerLen, "")
-
-			if node.Desc != "" {
-				descLen := len(node.Desc)
-				descHighlightLen := int(math.Min(
-					float64(descLen),
-					math.Max(float64(DESC_MAX_WIDTH), float64(descLen)),
-				))
-				fillerLen := int(DESC_MAX_WIDTH) - descHighlightLen
-				descStr := fmt.Sprintf("%-*s", descHighlightLen, node.Desc)
-				str += fmt.Sprintf("\t\t%s%*s", style.Render(descStr), fillerLen, "")
-			}
-
-		}
-
-		str += "\n"
-		b.WriteString(str)
-
-		if len(node.Children) > 0 {
-			childStr, childCount := m.renderTree(node.Children, indent+1, finalCount)
-			finalCount = childCount
-			b.WriteString(childStr)
+			// Style value and desc separately, keep padding plain
+			fmt.Fprintf(&b, "%s%s %s %s\n",
+				r.indent,
+				style.Render(r.value),
+				padding, // Plain spaces - never highlighted
+				style.Render(r.desc))
 		}
 	}
 
