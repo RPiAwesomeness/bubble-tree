@@ -118,10 +118,24 @@ func (m Model) Nodes() []Node {
 	return m.nodes
 }
 
+// Used to reset the tree to a completely new state, resetting cursor to root
 func (m *Model) SetNodes(nodes []Node) {
 	m.nodes = nodes
 	m.numNodes = numberOfNodes(nodes)
 	m.cursor = 0
+}
+
+// Update nodes in the tree along with total count, setting cursor to value provided.
+// NOTE: If the cursor value is greater than or equal to the number of nodes, the cursor will be
+// set to the last valid index
+func (m *Model) UpdateNodes(nodes []Node, cursor uint) {
+	m.nodes = nodes
+	m.numNodes = numberOfNodes(nodes)
+	if cursor >= m.numNodes {
+		m.cursor = m.numNodes - 1
+	} else {
+		m.cursor = cursor
+	}
 }
 
 func (m Model) ActiveNode() *Node {
@@ -154,7 +168,7 @@ func (m Model) ActiveNode() *Node {
 }
 
 func (m Model) ActivePath() []*Node {
-	var index int
+	index := 0
 
 	var findPath func([]Node) []*Node
 	findPath = func(nodes []Node) []*Node {
@@ -328,14 +342,14 @@ func (m Model) View() string {
 	)
 }
 
-func (m Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
-	type row struct {
-		indent string
-		value  string
-		desc   string
-		idx    uint
-	}
+type row struct {
+	indent string
+	value  string
+	desc   string
+	idx    uint
+}
 
+func (m Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) {
 	var rows []row
 	maxColWidth := 0
 
