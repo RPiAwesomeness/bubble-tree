@@ -126,6 +126,7 @@ func (m *Model) SetNodes(nodes []Node) {
 }
 
 // Update nodes in the tree along with total count, setting cursor to value provided.
+//
 // NOTE: If the cursor value is greater than or equal to the number of nodes, the cursor will be
 // set to the last valid index
 func (m *Model) UpdateNodes(nodes []Node, cursor uint) {
@@ -136,6 +137,96 @@ func (m *Model) UpdateNodes(nodes []Node, cursor uint) {
 	} else {
 		m.cursor = cursor
 	}
+}
+
+// Updates child nodes at path specified and numNodes to match new node count.
+//
+// Searches the tree for the values provided for path, setting the Children only
+// if matching nodes are found for every path value.
+func (m *Model) SetChildren(childNodes []Node, rootNodeValue string, path ...string) error {
+	idx := -1
+	for i, n := range m.nodes {
+		if n.Value == rootNodeValue {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return fmt.Errorf("root node not found for value %q", rootNodeValue)
+	}
+
+	// Start at found root node
+	n := &m.nodes[idx]
+
+	for _, searchVal := range path {
+		// Iterate over all nodes at the current depth
+		for i, child := range n.Children {
+			// Comparing value against the current path string
+			if child.Value != searchVal {
+				continue
+			}
+
+			// This node matches, point n at it and stop early
+			n = &n.Children[i]
+			break
+		}
+
+		if n == nil {
+			return fmt.Errorf("branch with %q value not found", searchVal)
+		}
+	}
+
+	if n == nil {
+		return fmt.Errorf("no matching node to set children on")
+	}
+
+	n.Children = childNodes
+	m.numNodes = numberOfNodes(m.nodes)
+
+	return nil
+}
+
+// Wrapper around SetChildren, starting search from first node.
+//
+// Helper method, intended for usage with trees with a single root.
+func (m *Model) SetChildrenFromRoot(childNodes []Node, path ...string) error {
+	if len(m.nodes) == 0 {
+		return fmt.Errorf("No nodes")
+	}
+	return m.SetChildren(childNodes, m.nodes[0].Value, path...)
+}
+
+// Wrapper around SetChildren, starting search from node specified by index.
+func (m *Model) SetChildrenStartingAt(childNodes []Node, index uint, path ...string) error {
+	numRootNodes := uint(len(m.nodes))
+	if numRootNodes == 0 {
+		return fmt.Errorf("No nodes")
+	}
+	if index >= numRootNodes {
+		return fmt.Errorf("Index %d invalid for %d root nodes", index, numRootNodes)
+	}
+	return m.SetChildren(childNodes, m.nodes[index].Value, path...)
+}
+
+func (m *Model) SetChildrenFunc(childNodes []Node, cmp func(nodes *[]Node) (node *Node, continueSearch bool)) error {
+	nodes := &m.nodes
+	for {
+		result, continueSearch := cmp(nodes)
+		if result == nil {
+			return fmt.Errorf("Unable to find matching value")
+		}
+		if continueSearch {
+			nodes = &result.Children
+			continue
+		}
+
+		// Found match & not continuing, set children
+		result.Children = childNodes
+		m.numNodes = numberOfNodes(m.nodes)
+		break
+	}
+
+	return nil
 }
 
 func (m Model) ActiveNode() *Node {
@@ -167,15 +258,15 @@ func (m Model) ActiveNode() *Node {
 	return nil
 }
 
-func (m Model) ActivePath() []*Node {
+func (m Model) ActivePath() []Node {
 	index := 0
 
-	var findPath func([]Node) []*Node
-	findPath = func(nodes []Node) []*Node {
+	var findPath func([]Node) []Node
+	findPath = func(nodes []Node) []Node {
 		for i, node := range nodes {
 			// Check if this is the active node
 			if index == int(m.cursor) {
-				return []*Node{&nodes[i]}
+				return []Node{nodes[i]}
 			}
 			index++
 
@@ -186,7 +277,7 @@ func (m Model) ActivePath() []*Node {
 
 			if path := findPath(node.Children); path != nil {
 				// Prepend current node to the path found in children
-				return append([]*Node{&nodes[i]}, path...)
+				return append([]Node{nodes[i]}, path...)
 			}
 		}
 		return nil

@@ -36,7 +36,7 @@ func initialModel() model {
 
 	top, right, bottom, left := styleDoc.GetPadding()
 	w = w - left - right
-	h = h - top - bottom
+	h = h - top - bottom - 1
 
 	nodes := []tree.Node{
 		{
@@ -117,6 +117,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "/":
+			// A bit contrived, since we know the default state, but it serves the demo
+			activeNodeVal := m.tree.ActiveNode().Value
+			newChildren := []tree.Node{
+				{Value: "SUCCESSfully found", Desc: "Active node value: " + activeNodeVal},
+			}
+			cmp := func(nodes *[]tree.Node) (node *tree.Node, continueSearch bool) {
+				for i := range *nodes {
+					nodeVal := (*nodes)[i].Value
+
+					if !strings.Contains(nodeVal, "Success") {
+						continue
+					}
+
+					isLeaf := nodeVal == "Success"
+					return &(*nodes)[i], !isLeaf
+				}
+
+				return nil, false
+			}
+			if err := m.tree.SetChildrenFunc(newChildren, cmp); err != nil {
+				m.msg = "ERROR: " + err.Error()
+			}
+
+		case "+":
+			newChildren := []tree.Node{
+				{Value: "Test0", Desc: "First new value"},
+				{Value: "Test1", Desc: "Second new value"},
+				{Value: "Test2", Desc: "Third new value"},
+			}
+
+			// Add child nodes at current depth
+			path := m.tree.ActivePath()
+			if len(path) == 1 {
+				// Must always pass the root value, but can pass just that, path is variadic and optional
+				newChildren[0].Desc = "Set via SetChildren without path"
+				m.tree.SetChildren(newChildren, path[0].Value)
+				break
+			}
+
+			pathValues := make([]string, len(path))
+			for i, node := range path {
+				pathValues[i] = node.Value
+			}
+
+			newChildren[0].Desc = "Set via SetChildren"
+			if err := m.tree.SetChildren(newChildren, pathValues[0], pathValues[1:]...); err != nil {
+				m.msg = "ERROR: " + err.Error()
+			}
+
 		case "enter":
 			if m.msg == "" {
 				// On the first time, update height to account for new string below
@@ -152,6 +202,7 @@ func (m model) View() tea.View {
 		styleDoc.Render(
 			lipgloss.JoinVertical(lipgloss.Left,
 				m.tree.View(),
+				lipgloss.NewStyle().Faint(true).Foreground(lipgloss.White).Render("+ replace children"),
 				m.msg,
 			),
 		),
