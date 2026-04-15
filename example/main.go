@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	styleDoc = lipgloss.NewStyle().Padding(1)
+	styleDoc = lipgloss.NewStyle().Padding(2)
 )
 
 const (
@@ -89,19 +89,18 @@ func initialModel() model {
 			},
 		},
 	}
-
-	return model{
-		tree: tree.New(
-			nodes,
-			w, h,
-			&tree.TreeOptions{
-				ChildPrefix:       "==>",         // tree.Sharp and tree.Smooth are options provided, but this can be any string
-				HighlightFullLine: true,          // Set to false to only highlight characters in .Value/.Desc
-				HighlightColor:    lipgloss.Cyan, // Any color.Color value, defaults to a nice purple
-				HelpKey:           "f1",          // Change keybind for showing help, default is "?". Requires ShowHelp to be set to true.
-				ShowHelp:          true,          // Set to true to show help text, default is false
-			}),
-	}
+	t := tree.New(
+		nodes,
+		w, h,
+		&tree.TreeOptions{
+			ChildPrefix:       "==> ", // tree.Sharp and tree.Smooth are options provided, but this can be any string
+			HighlightFullLine: true,   // Set to false to only highlight characters in .Value/.Desc
+			HelpKey:           "f1",   // Change keybind for showing help, default is "?". Requires ShowHelp to be set to true.
+			ShowHelp:          true,   // Set to true to show help text, default is false
+		})
+	t.Styles.Selected = t.Styles.Selected.Background(lipgloss.Cyan)
+	t.Styles.Shapes = t.Styles.Shapes.Foreground(lipgloss.Cyan)
+	return model{tree: t}
 }
 
 type model struct {

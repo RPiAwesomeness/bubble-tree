@@ -20,21 +20,19 @@ type Styles struct {
 	Shapes     lipgloss.Style
 	Selected   lipgloss.Style
 	Unselected lipgloss.Style
+	Background color.Color
 	Help       lipgloss.Style
 }
 
-func defaultStyles(highlightColor color.Color) Styles {
+func defaultStyles() Styles {
 	hasDarkBg := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
 	lightDark := lipgloss.LightDark(hasDarkBg)
 
-	if highlightColor == nil {
-		highlightColor = PURPLE
-	}
-
 	return Styles{
-		Shapes:     lipgloss.NewStyle().Margin(0).Foreground(highlightColor),
-		Selected:   lipgloss.NewStyle().Margin(0).Background(highlightColor).Foreground(BLACK),
+		Shapes:     lipgloss.NewStyle().Margin(0).Foreground(PURPLE),
+		Selected:   lipgloss.NewStyle().Margin(0).Background(PURPLE).Foreground(BLACK),
 		Unselected: lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
+		Background: lipgloss.NoColor{},
 		Help:       lipgloss.NewStyle().Margin(0).Foreground(lightDark(BLACK, WHITE)),
 	}
 }

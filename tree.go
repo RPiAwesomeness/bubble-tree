@@ -2,7 +2,6 @@ package tree
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -49,7 +48,6 @@ type TreeOptions struct {
 	HelpKey           string
 	ChildPrefix       TreeVariant
 	ShowHelp          bool
-	HighlightColor    color.Color
 	HighlightFullLine bool
 }
 
@@ -75,7 +73,6 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 	keyMap := DefaultKeyMap()
 	childPrefix := string(Smooth)
 	fullHighlight := false
-	var highlightColor color.Color = nil
 
 	if options != nil {
 		showHelp = options.ShowHelp
@@ -92,13 +89,11 @@ func New(nodes []Node, width, height int, options *TreeOptions) Model {
 		}
 
 		fullHighlight = options.HighlightFullLine
-
-		highlightColor = options.HighlightColor
 	}
 
 	return Model{
 		KeyMap:            keyMap,
-		Styles:            defaultStyles(highlightColor),
+		Styles:            defaultStyles(),
 		childPrefix:       childPrefix,
 		highlightFullLine: fullHighlight,
 
@@ -427,10 +422,17 @@ func (m Model) View() string {
 
 	help := m.helpView()
 	availableHeight := int(m.height) - lipgloss.Height(help)
-	return lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.NewStyle().Height(availableHeight).Render(renderedTree),
-		help,
-	)
+	return lipgloss.NewStyle().
+		Background(m.Styles.Background).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				lipgloss.NewStyle().
+					Height(availableHeight).
+					Background(m.Styles.Background).
+					Render(renderedTree),
+				help,
+			),
+		)
 }
 
 type row struct {
@@ -454,14 +456,14 @@ func (m Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) 
 
 			indentStr := ""
 			if indent > 0 {
-				indentStr = fmt.Sprintf("%s %s ",
+				indentStr = fmt.Sprintf("%s%s",
 					strings.Repeat(" ", int((indent-1)*2)),
 					m.Styles.Shapes.Render(m.childPrefix),
 				)
 			}
 
 			// Use lipgloss.Width for proper Unicode/ANSI handling
-			width := lipgloss.Width(indentStr) + lipgloss.Width(node.Value)
+			width := lipgloss.Width(indentStr) + lipgloss.Width(node.Value) + 1
 			if width > maxColWidth {
 				maxColWidth = width
 			}
@@ -487,20 +489,26 @@ func (m Model) renderTree(nodes []Node, indent uint, count uint) (string, uint) 
 
 		// Calculate how many spaces needed to align to maxColWidth + 1 (for gap)
 		currentWidth := lipgloss.Width(r.indent) + lipgloss.Width(r.value)
-		padding := strings.Repeat(" ", maxColWidth-currentWidth+1)
+		padding := strings.Repeat(" ", maxColWidth-currentWidth+2) // 2 include spaces
 
 		if m.highlightFullLine {
 			// Style everything after the tree indent
-			line := r.value + padding + r.desc
-			fmt.Fprintf(&b, "%s%s\n", r.indent, style.Render(line))
+			content := r.value + padding + r.desc
+			lineContent := fmt.Sprintf("%s%s", r.indent, style.Render(content))
+			fmt.Fprintf(&b, "%s%s",
+				lineContent,
+				style.Render(strings.Repeat(" ", int(m.width)-lipgloss.Width(lineContent))),
+			)
 		} else {
 			// Style value and desc separately, keep padding plain
-			fmt.Fprintf(&b, "%s%s %s %s\n",
+			fmt.Fprintf(&b, "%s%s%s%s",
 				r.indent,
 				style.Render(r.value),
 				padding, // Plain spaces - never highlighted
-				style.Render(r.desc))
+				style.Render(r.desc),
+			)
 		}
+		fmt.Fprintln(&b)
 	}
 
 	return b.String(), finalCount
